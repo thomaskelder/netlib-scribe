@@ -94,11 +94,11 @@
 			<version>1.9</version>
 		</dependency>
 
-<!-- 		<dependency> -->
-<!-- 			<groupId>org.neo4j</groupId> -->
-<!-- 			<artifactId>neo4j-rest-graphdb</artifactId> -->
-<!-- 			<version>2.0.2-SNAPSHOT</version> -->
-<!-- 		</dependency> -->
+		<!-- <dependency> -->
+		<!-- <groupId>org.neo4j</groupId> -->
+		<!-- <artifactId>neo4j-rest-graphdb</artifactId> -->
+		<!-- <version>2.0.2-SNAPSHOT</version> -->
+		<!-- </dependency> -->
 
 		<dependency>
 			<groupId>org.neo4j</groupId>
@@ -117,6 +117,13 @@
 			<artifactId>jackson-mapper-asl</artifactId>
 			<version>1.9.13</version>
 		</dependency>
+
+		<dependency>
+			<groupId>org.jdom</groupId>
+			<artifactId>jdom2</artifactId>
+			<version>2.0.5</version>
+		</dependency>
+
 
 	</dependencies>
 </project>

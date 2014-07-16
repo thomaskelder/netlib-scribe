@@ -1,5 +1,6 @@
 package org.networklibrary.scribe;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Logger;
 
@@ -30,6 +31,7 @@ public class App
     	Option typeOp = OptionBuilder.withArgName("[TYPE]").hasArg().withDescription("Output data type:").withType(String.class).create("t");
     	Option qtypeOp = OptionBuilder.withArgName("[QUERY TYPE]").hasArg().withDescription("type of query").withType(String.class).create("qt");
     	Option configOp = OptionBuilder.hasArg().withDescription("Alternative config file").withLongOpt("config").withType(String.class).create("c");
+    	Option extraOps = OptionBuilder.hasArg().withDescription("Extra configuration parameters for the import").withType(String.class).create("x");
     	
     	options.addOption(help);
     	options.addOption(dbOp);
@@ -37,6 +39,7 @@ public class App
     	options.addOption(typeOp);
     	options.addOption(configOp);
     	options.addOption(qtypeOp);
+    	options.addOption(extraOps);
     	
     	
     	CommandLineParser parser = new GnuParser();
@@ -76,6 +79,11 @@ public class App
             	config = line.getOptionValue("c");
             }
             
+            List<String> extras = null;
+            if(line.hasOption("x")){
+            	extras = Arrays.asList(line.getOptionValues("x"));
+            }
+            
             List<String> outputFiles = line.getArgList();
             
             // eeesh should move that to the ConfigManager ctor
@@ -87,13 +95,14 @@ public class App
             	confMgr = new ConfigManager();
             }
 
-            Scribe scribe = new Scribe(db,type,query,queryType,outputFiles,confMgr);
+            Scribe scribe = new Scribe(db,type,query,queryType,extras,outputFiles,confMgr);
             scribe.execute();
             
         }
-        catch( ParseException exp ) {
+        catch( Exception exp ) {
             // oops, something went wrong
             System.err.println( "Parsing failed.  Reason: " + exp.getMessage() );
+            exp.printStackTrace();
         }
     }
 }
