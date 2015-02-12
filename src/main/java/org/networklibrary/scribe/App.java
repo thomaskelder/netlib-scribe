@@ -11,7 +11,6 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.Options;
-import org.apache.commons.cli.ParseException;
 import org.networklibrary.core.config.ConfigManager;
 
 /**
@@ -20,18 +19,18 @@ import org.networklibrary.core.config.ConfigManager;
  */
 public class App 
 {
-	
 	protected static final Logger log = Logger.getLogger(App.class.getName());
-    public static void main( String[] args )
+    
+	public static void main( String[] args )
     {
     	Options options = new Options();
     	Option help = OptionBuilder.withDescription("Help message").create("help");
     	Option dbOp = OptionBuilder.withArgName("[URL]").hasArg().withDescription("Neo4j instance to scribe").withLongOpt("target").withType(String.class).create("db");
     	Option queryOp = OptionBuilder.withArgName("[QUERY]").hasArg().withDescription("Cypher query to execute:").withType(String.class).create("q");
-    	Option typeOp = OptionBuilder.withArgName("[TYPE]").hasArg().withDescription("Output data type:").withType(String.class).create("t");
+    	Option typeOp = OptionBuilder.withArgName("[OUTPUT TYPE]").hasArg().withDescription("Output data type:").withType(String.class).create("ot");
     	Option qtypeOp = OptionBuilder.withArgName("[QUERY TYPE]").hasArg().withDescription("type of query").withType(String.class).create("qt");
     	Option configOp = OptionBuilder.hasArg().withDescription("Alternative config file").withLongOpt("config").withType(String.class).create("c");
-    	Option extraOps = OptionBuilder.hasArg().withDescription("Extra configuration parameters for the import").withType(String.class).create("x");
+    	Option extraOps = OptionBuilder.hasArg().withDescription("Extra configuration parameters for the execution").withType(String.class).create("x");
     	
     	options.addOption(help);
     	options.addOption(dbOp);
@@ -40,7 +39,6 @@ public class App
     	options.addOption(configOp);
     	options.addOption(qtypeOp);
     	options.addOption(extraOps);
-    	
     	
     	CommandLineParser parser = new GnuParser();
         try {
@@ -60,8 +58,8 @@ public class App
             }
             
             String type = null;
-            if(line.hasOption("t")){
-            	type = line.getOptionValue("t");
+            if(line.hasOption("ot")){
+            	type = line.getOptionValue("ot");
             }
             
             String query = null;
@@ -100,7 +98,6 @@ public class App
             
         }
         catch( Exception exp ) {
-            // oops, something went wrong
             System.err.println( "Parsing failed.  Reason: " + exp.getMessage() );
             exp.printStackTrace();
         }

@@ -1,10 +1,7 @@
 package org.networklibrary.scribe.readers;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -20,7 +17,7 @@ import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.index.Index;
 import org.neo4j.graphdb.index.IndexHits;
-import org.networklibrary.scribe.NetworkUtils;
+import org.networklibrary.scribe.helpers.DataFromFiles;
 import org.networklibrary.scribe.writers.GraphWriter;
 
 public class ConnectNodesReader {
@@ -56,47 +53,42 @@ public class ConnectNodesReader {
 			File f = new File(query);
 			
 			if(f.exists()){
-				ids = readFromFile(f);
+				try {
+					ids = DataFromFiles.readFromFile(f);
+				} catch (IOException e) {
+					log.severe("failed to read ids from file " + f.getAbsolutePath() + ": " + e.getMessage());
+					ids = null;
+				}
 				log.info("query id provided via a file: " + f.getAbsolutePath());
 			} else {
+				// should allow for spaces and ; as well.
 				ids = Arrays.asList(query.split(",",-1)); 
 			}
 			
 			log.info("query contains " + ids.size() + " ids (+/-1) if header is present");
 
-			Set<Node> startNodes = new HashSet<Node>();
+			Set<Node> startNodes = idsToNodes(ids);
 
-			if(ids.size() > 0){
-				for(String id : ids){
-					Set<Node> nodes = queryId(id);
-					if(nodes != null && nodes.size() > 0){
-						startNodes.addAll(nodes);
-					}
-				}
-			}
-
-			crawlGraph(startNodes,writer);
+			if(startNodes != null)
+				crawlGraph(startNodes,writer);
 		}
 		
 	}
-
-	protected List<String> readFromFile(File f) {
-		List<String> ids = null;
-		try {
-			BufferedReader r = new BufferedReader(new FileReader(f));
-			ids = new ArrayList<String>();
+	
+	protected Set<Node> idsToNodes(List<String> ids){
+		Set<Node> res = null;
 		
-			while(r.ready()){
-				String line = r.readLine();
-				ids.add(line.trim());
+		if(ids != null && ids.size() > 0){
+			res = new HashSet<Node>();
+			for(String id : ids){
+				Set<Node> nodes = queryId(id);
+				if(nodes != null && nodes.size() > 0){
+					res.addAll(nodes);
+				}
 			}
-			r.close();
-			
-		} catch (IOException e) {
-			log.severe("failed to read ids from file " + f.getAbsolutePath() + ": " + e.getMessage());
-			return null;
 		}
-		return ids;
+		
+		return res;
 	}
 
 	protected void checkExtraParams(List<String> extras){
@@ -152,32 +144,21 @@ public class ConnectNodesReader {
 				}
 			}	
 		}
-		
-//		int maxDepth = 2;
-//		String depthParam = getExtraParameter("depth");
-//
-//		if(depthParam != null && !depthParam.isEmpty()){
-//			maxDepth = Integer.valueOf(depthParam);
-//		}
-//
-//		try (Transaction tx = graph.beginTx()){
-//			Set<Node> resultNodes = NetworkUtils.dfs(startNodes, maxDepth);
-//
-//			log.info("dealing with " + resultNodes.size() + " nodes");
-//
-//			for(Node n : resultNodes){
-//				writer.addNode(n);
-//
-//				for(Relationship r : n.getRelationships(Direction.OUTGOING)){
-//					if(resultNodes.contains(r.getOtherNode(n))){
-//						writer.addEdge(r);
-//					}
-//				}
-//			}
-//		}
 	}
 
+	
+	
+	protected GraphDatabaseService getGraph() {
+		return graph;
+	}
 
+	protected Index<Node> getMatchableIndex() {
+		return matchableIndex;
+	}
+	
+	protected GraphWriter getWriter() {
+		return writer;
+	}
 
 	protected boolean isNumeric(String str)
 	{

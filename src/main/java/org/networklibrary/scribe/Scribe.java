@@ -1,156 +1,140 @@
 package org.networklibrary.scribe;
 
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.logging.Logger;
 
-import org.neo4j.graphdb.Direction;
 import org.neo4j.graphdb.GraphDatabaseService;
-import org.neo4j.graphdb.Node;
-import org.neo4j.graphdb.Relationship;
-import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
-import org.neo4j.graphdb.index.Index;
-import org.neo4j.graphdb.index.IndexHits;
 import org.networklibrary.core.config.ConfigManager;
+import org.networklibrary.scribe.readers.ConnectNodesReader;
+import org.networklibrary.scribe.readers.ConnectSetsReader;
+import org.networklibrary.scribe.readers.CypherQueryReader;
+import org.networklibrary.scribe.readers.DumpEdgesReader;
+import org.networklibrary.scribe.writers.CypherResultWriter;
+import org.networklibrary.scribe.writers.GraphWriter;
+import org.networklibrary.scribe.writers.impl.CypherTabWriter;
+import org.networklibrary.scribe.writers.impl.CypherXGMMLWriter;
+import org.networklibrary.scribe.writers.impl.DirectXGMMLWriter;
 
 public class Scribe {
 
 	protected static final Logger log = Logger.getLogger(Scribe.class.getName());
 
-	private final static String MATCH = "matchid";
-
-	private String type = null;
+	private String outType = null;
 	private String query = null;
-	private String queryType;
-	private Map<String, String> extraParams = null; 
+	private String queryType; 
 	private List<String> outputFiles = null;
 	private ConfigManager confMgr = null;
 	private String db = null;
+	private List<String> extras;
 
 	private GraphDatabaseService graph = null;
-	private Index<Node> matchableIndex = null;
+	
 
-	public Scribe(String db, String type, String query,
+	public Scribe(String db, String outType, String query,
 			String queryType, List<String> extras, List<String> outputFiles, ConfigManager confMgr) {
 
-		this.type = type;
+		this.outType = outType;
 		this.query = query;
 		this.queryType = queryType;
 		this.outputFiles = outputFiles;
 		this.confMgr = confMgr;
 		this.db = db;
+		this.extras = extras;
 
-		graph = new GraphDatabaseFactory().newEmbeddedDatabase(db);
-		try (Transaction tx = graph.beginTx()){
-			matchableIndex = graph.index().forNodes("matchable");
-		}
-		checkExtraParams(extras);
+		graph = new GraphDatabaseFactory().newEmbeddedDatabase(db);		
 	}
 
 	public void execute() throws IOException {
 
-//		GraphWriter writer = new XGMMLWriter();
-		GraphWriter writer = new DirectXGMMLWriter();
-		writer.setWriter(new PrintWriter(outputFiles.get(0)));
-		writer.setGraphLabel(db);
+		switch(queryType.toLowerCase()){
+		case "cypher":
 
-		if(query != null && !query.isEmpty()){
-			if(queryType.equals("linkedneighbour")){
-				List<String> ids = Arrays.asList(query.split(",",-1));
+			CypherResultWriter cypherWriter = decideCypherWriter();
 
-				Set<Node> startNodes = new HashSet<Node>();
+			CypherQueryReader cypherExec = new CypherQueryReader(graph,cypherWriter);
+			cypherExec.executeCypher(query);
+			
+			cypherWriter.finishUp();
 
-				if(ids.size() > 0){
-					for(String id : ids){
-						startNodes.addAll(queryId(id));
-					}
-				}
-
-				crawlGraph(startNodes,writer);
-				writer.write();
+			break;
+			
+		case "connect":
+			{
+			GraphWriter graphWriter = decideGraphWriter();
+			
+			ConnectNodesReader connNodesReader = new ConnectNodesReader(graph, graphWriter, extras);
+			connNodesReader.execute(query);
+			
+			graphWriter.finishUp();
 			}
+			break;
+			
+		case "connectSets":
+			{
+			GraphWriter graphWriter = decideGraphWriter();
+			
+			ConnectSetsReader connectSetsReader = new ConnectSetsReader(graph,graphWriter, extras);
+			connectSetsReader.execute(query);
+			
+			graphWriter.finishUp();
+			}
+			break;
+			
+		case "dump_edges":
+			
+			DumpEdgesReader dumper = new DumpEdgesReader(graph,outputFiles.get(0));
+			dumper.execute();
 
+			break;
+
+		default:
+			System.out.println("Scribe says: I do not understand " + queryType);
+			break;
 		}
 
 		graph.shutdown();
-		// ignore type
-		// ignore query for now
 	}
 
-	protected Set<Node> queryId(String id) {
-		Set<Node> result = null;
-		try (Transaction tx = graph.beginTx()) {
-			IndexHits<Node> hits = matchableIndex.get(MATCH, id);
-
-			if(hits.size() > 0)
-				result = new HashSet<Node>();
-
-			for(Node n : hits){
-				result.add(n);
-			}
-			hits.close();
-		}
-
-		return result;
-	}
-
-	protected void crawlGraph(Set<Node> startNodes, GraphWriter writer) {
-		int maxDepth = 2;
-		String depthParam = getExtraParameter("depth");
-
-		if(depthParam != null && !depthParam.isEmpty()){
-			maxDepth = Integer.valueOf(depthParam);
-		}
-
-		try (Transaction tx = graph.beginTx()){
-			Set<Node> resultNodes = NetworkUtils.dfs(startNodes, maxDepth);
-
-			log.info("dealing with " + resultNodes.size() + " nodes");
+	protected CypherResultWriter decideCypherWriter(){
+		CypherResultWriter writer = null;
+		switch(outType.toLowerCase()){
+		case "tab":
+			writer = new CypherTabWriter();
+			break;
 			
-			for(Node n : resultNodes){
-				writer.addNode(n);
+		case "xgmml":
+			writer = new CypherXGMMLWriter();
+			break;
 
-				for(Relationship r : n.getRelationships(Direction.OUTGOING)){
-					if(resultNodes.contains(r.getOtherNode(n))){
-						writer.addEdge(r);
-					}
-				}
-			}
+		default:
+			System.out.println("Scribe says: I can not write " + queryType);
+			break;
 		}
+
+		if(writer != null){
+			writer.setOutputFile(outputFiles.get(0));
+		}
+
+		return writer;
 	}
+	
+	protected GraphWriter decideGraphWriter(){
+		GraphWriter writer = null;
+		switch(outType.toLowerCase()){
+		case "xgmml":
+			writer = new DirectXGMMLWriter();
+			writer.setWriter(outputFiles.get(0));
+			writer.setGraphLabel(db);
+			break;
 
-	protected void checkExtraParams(List<String> extras){
-
-		if(extras.size() > 0){
-			extraParams = new HashMap<String,String>();
+		default:
+			System.out.println("Scribe says: I can not write " + queryType);
+			break;
 		}
 
-		for(String extra : extras){
-			String values[] = extra.split("=",-1);
-
-			extraParams.put(values[0], values[1]);
-		}
-	}
-
-	protected String getExtraParameter(String name){
-		String res = null;
-		if(extraParams != null){
-			res = extraParams.get(name);
-		}
-
-		return res;
-	}
-
-	protected boolean isNumeric(String str)
-	{
-		return str.matches("-?\\d+(\\.\\d+)?");  //match a number with optional '-' and decimal.
+		return writer;
 	}
 
 }
