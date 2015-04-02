@@ -11,6 +11,7 @@ import org.networklibrary.scribe.readers.ConnectNodesReader;
 import org.networklibrary.scribe.readers.ConnectSetsReader;
 import org.networklibrary.scribe.readers.CypherQueryReader;
 import org.networklibrary.scribe.readers.DumpEdgesReader;
+import org.networklibrary.scribe.readers.DumpEdgesWithPropsReader;
 import org.networklibrary.scribe.writers.CypherResultWriter;
 import org.networklibrary.scribe.writers.GraphWriter;
 import org.networklibrary.scribe.writers.impl.CypherTabWriter;
@@ -89,6 +90,13 @@ public class Scribe {
 
 			break;
 
+		case "dump_edges_props":
+			
+			DumpEdgesWithPropsReader pdumper = new DumpEdgesWithPropsReader(graph, outputFiles.get(0));
+			pdumper.execute();
+			
+			break;
+			
 		default:
 			System.out.println("Scribe says: I do not understand " + queryType);
 			break;
